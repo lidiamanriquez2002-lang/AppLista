@@ -48,6 +48,15 @@ function Icon({ name, className }) {
           <path d="M4 19h16" />
         </svg>
       );
+    case "grid":
+      return (
+        <svg {...common}>
+          <rect x="3" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="3" width="7" height="7" rx="1.5" />
+          <rect x="3" y="14" width="7" height="7" rx="1.5" />
+          <rect x="14" y="14" width="7" height="7" rx="1.5" />
+        </svg>
+      );
     case "user":
       return (
         <svg {...common}>
@@ -64,6 +73,7 @@ const items = [
   { href: "/", label: "Lista", icon: "check" },
   { href: "/estadisticas", label: "Stats", icon: "chart" },
   { href: "/listas", label: "Cursos", icon: "list" },
+  { href: "/registro", label: "Registro", icon: "grid" },
   { href: "/exportar", label: "Excel", icon: "download" },
   { href: "/profesor", label: "Panel", icon: "user" }
 ];
@@ -72,14 +82,14 @@ export default function Nav() {
   const pathname = usePathname();
   return (
     <nav className="fixed bottom-3 inset-x-3 z-40">
-      <div className="mx-auto grid max-w-lg grid-cols-5 rounded-xl3 border border-line bg-white/95 p-1.5 shadow-card backdrop-blur">
+      <div className="mx-auto grid max-w-lg grid-cols-6 rounded-xl3 border border-line bg-white/95 p-1.5 shadow-card backdrop-blur">
         {items.map((it) => {
           const active = pathname === it.href;
           return (
             <Link
               key={it.href}
               href={it.href}
-              className={`flex flex-col items-center gap-1 rounded-xl2 py-2 text-[10.5px] font-bold transition-all ${
+              className={`flex flex-col items-center gap-1 rounded-xl2 py-2 text-[9.5px] font-bold transition-all ${
                 active
                   ? "grad-primary text-white shadow-primary"
                   : "text-inksoft hover:bg-paper hover:text-ink"
