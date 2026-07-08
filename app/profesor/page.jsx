@@ -9,14 +9,35 @@ export default function Profesor() {
   const [resumen, setResumen] = useState([]);
   const [cargando, setCargando] = useState(true);
 
+  // Ficha del profesor
+  const [perfil, setPerfil] = useState(null);
+  const [editandoPerfil, setEditandoPerfil] = useState(false);
+  const [form, setForm] = useState({
+    nombre: "", correo: "", asignatura: "", establecimiento: "", telefono: ""
+  });
+  const [guardandoPerfil, setGuardandoPerfil] = useState(false);
+
   useEffect(() => {
     (async () => {
-      const { data: cursos } = await supabase.from("cursos").select("*").order("nombre");
-      const { data: ests } = await supabase.from("estudiantes").select("id, curso_id");
-      const { data: regs } = await supabase.from("asistencia")
-        .select("estudiante_id, fecha, estado");
-      const hoy = hoyISO();
+      const [{ data: cursos }, { data: ests }, { data: regs }, { data: prof }] =
+        await Promise.all([
+          supabase.from("cursos").select("*").order("nombre"),
+          supabase.from("estudiantes").select("id, curso_id"),
+          supabase.from("asistencia").select("estudiante_id, fecha, estado"),
+          supabase.from("profesor").select("*").limit(1)
+        ]);
 
+      const p = prof?.[0] || null;
+      setPerfil(p);
+      if (p) {
+        setForm({
+          nombre: p.nombre || "", correo: p.correo || "",
+          asignatura: p.asignatura || "", establecimiento: p.establecimiento || "",
+          telefono: p.telefono || ""
+        });
+      }
+
+      const hoy = hoyISO();
       const filas = (cursos || []).map((c) => {
         const idsCurso = (ests || []).filter((e) => e.curso_id === c.id).map((e) => e.id);
         const propios = (regs || []).filter((r) => idsCurso.includes(r.estudiante_id));
@@ -43,9 +64,38 @@ export default function Profesor() {
     })();
   }, []);
 
+  async function guardarPerfil() {
+    setGuardandoPerfil(true);
+    let error;
+    if (perfil?.id) {
+      ({ error } = await supabase.from("profesor")
+        .update({ ...form, updated_at: new Date().toISOString() })
+        .eq("id", perfil.id));
+    } else {
+      const res = await supabase.from("profesor").insert(form).select().single();
+      error = res.error;
+      if (res.data) setPerfil(res.data);
+    }
+    setGuardandoPerfil(false);
+    if (error) {
+      alert(
+        "Error al guardar: " + error.message +
+        "\n\n¿Ejecutaste supabase/profesor.sql en el SQL Editor?"
+      );
+      return;
+    }
+    setPerfil((p) => ({ ...(p || {}), ...form }));
+    setEditandoPerfil(false);
+  }
+
   const totalEst = resumen.reduce((a, r) => a + r.nEstudiantes, 0);
   const listasHoy = resumen.filter((r) => r.hoy.completa).length;
   const pendientes = resumen.filter((r) => !r.hoy.completa && r.nEstudiantes > 0);
+
+  const inputCls =
+    "w-full rounded-xl2 border border-line bg-white px-4 py-3 text-[15px] font-medium outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/15";
+
+  const tienePerfil = perfil && (perfil.nombre || "").trim() !== "";
 
   return (
     <div>
@@ -64,6 +114,87 @@ export default function Profesor() {
         </p>
       ) : (
         <>
+          {/* Ficha del profesor */}
+          <section className="mb-5 overflow-hidden rounded-xl3 border border-line bg-white shadow-soft">
+            {!editandoPerfil ? (
+              <div className="flex items-center gap-4 p-5">
+                <div className="grad-primary flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-xl font-extrabold text-white shadow-primary">
+                  {tienePerfil
+                    ? perfil.nombre.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase()
+                    : "?"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  {tienePerfil ? (
+                    <>
+                      <p className="truncate font-extrabold">{perfil.nombre}</p>
+                      <p className="truncate text-xs font-semibold text-inksoft">
+                        {[perfil.asignatura, perfil.establecimiento].filter(Boolean).join(" · ") || "Sin detalles"}
+                      </p>
+                      {(perfil.correo || perfil.telefono) && (
+                        <p className="truncate text-xs font-medium text-inksoft">
+                          {[perfil.correo, perfil.telefono].filter(Boolean).join(" · ")}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-extrabold">Completa tus datos</p>
+                      <p className="text-xs font-semibold text-inksoft">
+                        Aparecerán en el panel y en el Excel exportado
+                      </p>
+                    </>
+                  )}
+                </div>
+                <button
+                  onClick={() => setEditandoPerfil(true)}
+                  className="shrink-0 rounded-full border border-line bg-white px-4 py-2 text-sm font-extrabold text-primary transition hover:border-primary/50 active:scale-95"
+                >
+                  {tienePerfil ? "Editar" : "Completar"}
+                </button>
+              </div>
+            ) : (
+              <div className="p-5 fade-in">
+                <h2 className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-inksoft">
+                  Datos del profesor
+                </h2>
+                <div className="mt-3 space-y-2.5">
+                  <input className={inputCls} placeholder="Nombre completo *"
+                    value={form.nombre}
+                    onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
+                  <input className={inputCls} placeholder="Asignatura (ej: Matemática)"
+                    value={form.asignatura}
+                    onChange={(e) => setForm({ ...form, asignatura: e.target.value })} />
+                  <input className={inputCls} placeholder="Establecimiento"
+                    value={form.establecimiento}
+                    onChange={(e) => setForm({ ...form, establecimiento: e.target.value })} />
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <input className={inputCls} type="email" placeholder="Correo"
+                      value={form.correo}
+                      onChange={(e) => setForm({ ...form, correo: e.target.value })} />
+                    <input className={inputCls} type="tel" placeholder="Teléfono"
+                      value={form.telefono}
+                      onChange={(e) => setForm({ ...form, telefono: e.target.value })} />
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2.5">
+                  <button
+                    onClick={() => setEditandoPerfil(false)}
+                    className="rounded-xl2 border border-line bg-white py-3 font-extrabold text-inksoft transition active:scale-95"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={guardarPerfil}
+                    disabled={guardandoPerfil || !form.nombre.trim()}
+                    className="grad-primary rounded-xl2 py-3 font-extrabold text-white shadow-primary transition active:scale-95 disabled:opacity-40 disabled:shadow-none"
+                  >
+                    {guardandoPerfil ? "Guardando…" : "Guardar"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </section>
+
           {/* KPIs */}
           <div className="grid grid-cols-3 gap-2.5">
             <div className="grad-primary rounded-xl2 p-4 text-white shadow-primary">

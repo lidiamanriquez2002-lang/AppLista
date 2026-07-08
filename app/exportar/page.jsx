@@ -30,6 +30,8 @@ export default function Exportar() {
     const curso = cursos.find((c) => c.id === cursoId);
     const { data: ests } = await supabase.from("estudiantes").select("*")
       .eq("curso_id", cursoId).order("apellido").order("nombre");
+    const { data: profData } = await supabase.from("profesor").select("*").limit(1);
+    const prof = profData?.[0] || null;
 
     const ids = (ests || []).map((e) => e.id);
     let registros = [];
@@ -74,6 +76,24 @@ export default function Exportar() {
     );
     wsLista["!cols"] = [{ wch: 4 }, { wch: 18 }, { wch: 18 }];
     XLSX.utils.book_append_sheet(wb, wsLista, "Estudiantes");
+
+    // Hoja 3: datos del profesor (si están completados en el Panel)
+    if (prof && (prof.nombre || "").trim() !== "") {
+      const wsProf = XLSX.utils.aoa_to_sheet([
+        ["Datos del profesor", ""],
+        ["Nombre", prof.nombre || ""],
+        ["Asignatura", prof.asignatura || ""],
+        ["Establecimiento", prof.establecimiento || ""],
+        ["Correo", prof.correo || ""],
+        ["Teléfono", prof.telefono || ""],
+        ["", ""],
+        ["Curso exportado", curso?.nombre || ""],
+        ["Rango", `${desde || "inicio"} a ${hasta || "hoy"}`],
+        ["Fecha de exportación", hoyISO()]
+      ]);
+      wsProf["!cols"] = [{ wch: 22 }, { wch: 34 }];
+      XLSX.utils.book_append_sheet(wb, wsProf, "Profesor");
+    }
 
     XLSX.writeFile(
       wb,
